@@ -1,0 +1,16 @@
+{
+  "name": "kyc-admin",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Multi-Region KYC Dashboard with Real-Time Audit Logs - MERN stack",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev\"",
+    "build": "npm run build --prefix frontend",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
