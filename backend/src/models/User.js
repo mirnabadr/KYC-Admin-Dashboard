@@ -90,7 +90,7 @@ userSchema.methods.toJSON = function() {
 };
 
 // Indexes for performance
-userSchema.index({ email: 1 });
+// Note: email already has index: true in schema definition, so we don't need duplicate index here
 userSchema.index({ role: 1, region: 1 });
 userSchema.index({ isActive: 1 });
 

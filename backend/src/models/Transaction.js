@@ -9,24 +9,20 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    index: true,
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   },
   userEmail: {
     type: String,
     required: true,
-    index: true,
   },
   region: {
     type: String,
     required: true,
     enum: ['US', 'EU', 'APAC', 'LATAM'],
-    index: true,
   },
   amountUSD: {
     type: Number,
@@ -43,7 +39,6 @@ const transactionSchema = new mongoose.Schema({
     required: true,
     enum: ['Pending', 'Approved', 'Rejected'],
     default: 'Pending',
-    index: true,
   },
   // KYC-related fields
   kycStatus: {
@@ -61,7 +56,6 @@ const transactionSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
-    index: true,
   },
   updatedAt: {
     type: Date,
@@ -92,7 +86,7 @@ transactionSchema.pre('save', function(next) {
 });
 
 // Indexes for performance and filtering
-transactionSchema.index({ transactionId: 1 });
+// Note: transactionId already has unique: true which creates an index automatically
 transactionSchema.index({ userId: 1 });
 transactionSchema.index({ userEmail: 1 });
 transactionSchema.index({ region: 1, status: 1 });

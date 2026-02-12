@@ -1,14 +1,11 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
-import { Logo } from '../components/Logo';
 import { Mail, Lock, Shield, CheckCircle2 } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
-import React from 'react';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -18,7 +15,7 @@ export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -28,10 +25,12 @@ export function Login() {
       if (success) {
         navigate('/');
       } else {
-        setError('Invalid email or password');
+        setError('Login failed. Please try again.');
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch (err: unknown) {
+      // Show the actual error (e.g., backend not running, invalid credentials)
+      const message = err instanceof Error ? err.message : 'An error occurred. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }

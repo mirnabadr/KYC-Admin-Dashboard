@@ -1,11 +1,8 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import { useTheme } from '../context/ThemeContext';
 import { Sun, Moon, Monitor } from 'lucide-react';
-import { Button } from '../components/ui/button';
 import { GlassCard } from '../components/GlassCard';
-import React from 'react';
 
 export function Settings() {
   const { theme, setTheme } = useTheme();

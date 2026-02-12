@@ -8,7 +8,7 @@ import { config } from '../config/env.js';
 import { cache } from './cache.js';
 import { getBearerToken } from './cybridTokenManager.js';
 
-const CACHE_TTL = 60; // Cache rates for 60 seconds
+const CACHE_TTL = 30; // Cache rates for 60 seconds
 const CACHE_KEY_PREFIX = 'cybrid_rate_';
 
 /**
@@ -27,12 +27,40 @@ export async function fetchRate(from = 'USD', to = 'USDC') {
     return cached;
   }
 
-  // If API credentials are not configured, use mock
-  if (!config.cybrid.apiKey || config.cybrid.apiKey === 'your-api-key' || !config.cybrid.apiSecret) {
-    console.log(`🔧 Using mock rate for ${from}/${to} (Cybrid API credentials not configured)`);
-    const mockRate = getMockRate(from, to);
-    cache.set(cacheKey, mockRate, CACHE_TTL);
-    return mockRate;
+  // If API credentials are not configured, try Beeceptor mock API or fallback to hardcoded mock
+  if (!config.cybrid.apiKey || 
+      config.cybrid.apiKey === 'your-api-key' || 
+      config.cybrid.apiKey === 'your-client-id-here' ||
+      !config.cybrid.apiSecret ||
+      config.cybrid.apiSecret === 'your-client-secret-here') {
+    
+    // Check if Beeceptor mock URL is configured
+    const mockApiUrl = config.cybrid.apiUrl;
+    const isBeeceptorMock = mockApiUrl && (
+      mockApiUrl.includes('beeceptor.com') || 
+      mockApiUrl.includes('free.beeceptor.com')
+    );
+
+    if (isBeeceptorMock) {
+      // Try to fetch from Beeceptor mock API
+      try {
+        console.log(`🔧 Fetching rate from Beeceptor mock API: ${mockApiUrl}`);
+        const rate = await callBeeceptorMockAPI(mockApiUrl, from, to);
+        cache.set(cacheKey, rate, CACHE_TTL);
+        return rate;
+      } catch (error) {
+        console.warn(`⚠️ Beeceptor mock API failed: ${error.message}. Falling back to hardcoded mock.`);
+        const mockRate = getMockRate(from, to);
+        cache.set(cacheKey, mockRate, CACHE_TTL);
+        return mockRate;
+      }
+    } else {
+      // Use hardcoded mock
+      console.log(`🔧 Using hardcoded mock rate for ${from}/${to} (Cybrid API credentials not configured)`);
+      const mockRate = getMockRate(from, to);
+      cache.set(cacheKey, mockRate, CACHE_TTL);
+      return mockRate;
+    }
   }
 
   // Call real Cybrid API
@@ -46,6 +74,43 @@ export async function fetchRate(from = 'USD', to = 'USDC') {
     cache.set(cacheKey, mockRate, CACHE_TTL);
     return mockRate;
   }
+}
+
+/**
+ * Call Beeceptor mock API
+ * Simple GET request to mock endpoint
+ * @param {string} apiUrl - Beeceptor mock API base URL
+ * @param {string} from - Source currency
+ * @param {string} to - Target currency
+ * @returns {Promise<object>} - Rate response
+ */
+async function callBeeceptorMockAPI(apiUrl, from, to) {
+  const url = `${apiUrl}/rates?from=${from}&to=${to}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Beeceptor API returned ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  // Handle different response formats
+  // Format 1: { rate: 1.0 }
+  // Format 2: { from: "USD", to: "USDC", rate: 1.0, timestamp: "..." }
+  const rate = data.rate || 1.0;
+  
+  return {
+    from: data.from || from,
+    to: data.to || to,
+    rate: typeof rate === 'number' ? rate : parseFloat(rate) || 1.0,
+    timestamp: data.timestamp || new Date().toISOString(),
+  };
 }
 
 /**

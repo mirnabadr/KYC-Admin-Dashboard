@@ -1,5 +1,5 @@
 import { cn } from './ui/utils';
-import React from 'react'; 
+
 interface UserAvatarProps {
   name: string;
   email?: string;

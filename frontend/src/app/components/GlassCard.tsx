@@ -1,6 +1,5 @@
 import { ReactNode } from 'react';
 import { cn } from './ui/utils';
-import React from 'react';
 
 interface GlassCardProps {
   children: ReactNode;
@@ -16,8 +15,8 @@ export function GlassCard({ children, className, hover = false }: GlassCardProps
         // Light theme
         'bg-white/80 backdrop-blur-sm border-slate-200/50',
         'shadow-[0_8px_30px_rgb(0,0,0,0.04)]',
-        // Dark theme
-        'dark:bg-slate-900/80 dark:border-slate-700/50',
+        // Dark theme - dark blue-slate cards
+        'dark:bg-slate-800/90 dark:border-slate-600/30',
         'dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]',
         hover && [
           'hover:scale-[1.02] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)]',

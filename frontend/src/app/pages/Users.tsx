@@ -1,8 +1,6 @@
-import React from 'react';
-import { useState } from 'react';
-import { mockUsers, UserData } from '../data/mockData';
-import { UserRole, Region } from '../context/AuthContext'; 
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { useState, useEffect } from 'react';
+import { usersApi } from '../services/api';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
@@ -37,7 +35,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '../components/ui/pagination';
-import { UserPlus, Edit, User as UserIcon, Mail, Calendar, MapPin, Shield } from 'lucide-react';
+import { UserPlus, Edit, Mail, Calendar, MapPin, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { GlassCard } from '../components/GlassCard';
 import { UserAvatar } from '../components/UserAvatar';
@@ -47,16 +45,33 @@ const ITEMS_PER_PAGE = 5;
 
 export function Users() {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<any[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserData | null>(null);
-  const [viewingUser, setViewingUser] = useState<UserData | null>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [viewingUser, setViewingUser] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, limit: ITEMS_PER_PAGE, total: 0, pages: 1 });
 
-  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedUsers = users.slice(startIndex, endIndex);
+  useEffect(() => {
+    if (currentUser?.role === 'Global Admin') {
+      fetchUsers();
+    }
+  }, [currentPage, currentUser]);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await usersApi.getAll({ page: currentPage, limit: ITEMS_PER_PAGE });
+      setUsers(response.data || []);
+      setPagination(response.pagination || { page: 1, limit: ITEMS_PER_PAGE, total: 0, pages: 1 });
+    } catch (error: any) {
+      console.error('Failed to fetch users:', error);
+      toast.error('Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePrevious = () => {
     if (currentPage > 1) {
@@ -65,13 +80,15 @@ export function Users() {
   };
 
   const handleNext = () => {
-    if (currentPage < totalPages) {
+    if (currentPage < pagination.pages) {
       setCurrentPage(currentPage + 1);
     }
   };
   
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
+    name: '',
     role: 'Sending Partner' as string,
     region: 'US' as string,
   });
@@ -87,39 +104,47 @@ export function Users() {
     );
   }
 
-  const handleAddUser = () => {
-    const newUser: UserData = {
-      id: `USR-${String(users.length + 1).padStart(3, '0')}`,
-      email: formData.email,
-      role: formData.role,
-      region: formData.region as Region,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    
-    setUsers([...users, newUser]);
-    setIsAddDialogOpen(false);
-    setFormData({ email: '', role: 'Sending Partner', region: 'US' });
-    toast.success('User added successfully');
+  const handleAddUser = async () => {
+    try {
+      await usersApi.create({
+        email: formData.email,
+        password: formData.password || 'TempPassword123!',
+        name: formData.name || formData.email.split('@')[0],
+        role: formData.role,
+        region: formData.region,
+      });
+      toast.success('User added successfully');
+      setIsAddDialogOpen(false);
+      setFormData({ email: '', password: '', name: '', role: 'Sending Partner', region: 'US' });
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add user');
+    }
   };
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (!editingUser) return;
     
-    setUsers(users.map(u => 
-      u.id === editingUser.id 
-        ? { ...u, role: formData.role, region: formData.region as Region }
-        : u
-    ));
-    
-    setEditingUser(null);
-    setFormData({ email: '', role: 'Sending Partner', region: 'US' });
-    toast.success('User updated successfully');
+    try {
+      await usersApi.update(editingUser.id, {
+        role: formData.role,
+        region: formData.region,
+      });
+      toast.success('User updated successfully');
+      setEditingUser(null);
+      setFormData({ email: '', password: '', name: '', role: 'Sending Partner', region: 'US' });
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update user');
+    }
   };
 
-  const openEditDialog = (user: UserData) => {
+  const openEditDialog = (user: any) => {
     setEditingUser(user);
     setFormData({
       email: user.email,
+      password: '',
+      name: user.name || '',
       role: user.role,
       region: user.region,
     });
@@ -160,6 +185,28 @@ export function Users() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="User Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Temporary password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
                 <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
                   <SelectTrigger>
@@ -190,10 +237,6 @@ export function Users() {
                 </Select>
               </div>
 
-              <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded">
-                Note: A temporary password will be sent to the user's email
-              </div>
-
               <Button onClick={handleAddUser} className="w-full">
                 Create User
               </Button>
@@ -205,102 +248,118 @@ export function Users() {
       {/* Users Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Created At</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow 
-                    key={user.id}
-                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                    onClick={() => setViewingUser(user)}
-                  >
-                    <TableCell className="font-medium text-sm">{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {user.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{user.region}</TableCell>
-                    <TableCell className="text-sm text-slate-600 dark:text-slate-400">{user.createdAt}</TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => openEditDialog(user)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Dialog open={editingUser?.id === user.id} onOpenChange={(open) => !open && setEditingUser(null)}>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit User</DialogTitle>
-                            <DialogDescription>
-                              Update user role and region assignment
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <Label>Email</Label>
-                              <Input value={formData.email} disabled />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-role">Role</Label>
-                              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Global Admin">Global Admin</SelectItem>
-                                  <SelectItem value="Regional Admin">Regional Admin</SelectItem>
-                                  <SelectItem value="Sending Partner">Sending Partner</SelectItem>
-                                  <SelectItem value="Receiving Partner">Receiving Partner</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-region">Region</Label>
-                              <Select value={formData.region} onValueChange={(value) => setFormData({ ...formData, region: value })}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="All Regions">All Regions</SelectItem>
-                                  <SelectItem value="US">US</SelectItem>
-                                  <SelectItem value="EU">EU</SelectItem>
-                                  <SelectItem value="APAC">APAC</SelectItem>
-                                  <SelectItem value="LATAM">LATAM</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <Button onClick={handleEditUser} className="w-full">
-                              Update User
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
+          {loading ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              Loading users...
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Region</TableHead>
+                    <TableHead>Created At</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        No users found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow 
+                        key={user.id}
+                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        onClick={() => setViewingUser(user)}
+                      >
+                        <TableCell className="font-medium text-sm">{user.email}</TableCell>
+                        <TableCell className="text-sm">{user.name || '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{user.region}</TableCell>
+                        <TableCell className="text-sm text-slate-600 dark:text-slate-400">{user.createdAt}</TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => openEditDialog(user)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Dialog open={editingUser?.id === user.id} onOpenChange={(open) => !open && setEditingUser(null)}>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Edit User</DialogTitle>
+                                <DialogDescription>
+                                  Update user role and region assignment
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                  <Label>Email</Label>
+                                  <Input value={formData.email} disabled />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit-role">Role</Label>
+                                  <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Global Admin">Global Admin</SelectItem>
+                                      <SelectItem value="Regional Admin">Regional Admin</SelectItem>
+                                      <SelectItem value="Sending Partner">Sending Partner</SelectItem>
+                                      <SelectItem value="Receiving Partner">Receiving Partner</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="edit-region">Region</Label>
+                                  <Select value={formData.region} onValueChange={(value) => setFormData({ ...formData, region: value })}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="All Regions">All Regions</SelectItem>
+                                      <SelectItem value="US">US</SelectItem>
+                                      <SelectItem value="EU">EU</SelectItem>
+                                      <SelectItem value="APAC">APAC</SelectItem>
+                                      <SelectItem value="LATAM">LATAM</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <Button onClick={handleEditUser} className="w-full">
+                                  Update User
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {pagination.pages > 1 && (
         <div className="flex items-center justify-end">
           <Pagination>
             <PaginationContent>
@@ -316,7 +375,7 @@ export function Users() {
               </PaginationItem>
               <PaginationItem>
                 <span className="text-sm text-slate-600 dark:text-slate-400 px-4">
-                  Page {currentPage} of {totalPages}
+                  Page {currentPage} of {pagination.pages}
                 </span>
               </PaginationItem>
               <PaginationItem>
@@ -326,7 +385,7 @@ export function Users() {
                     e.preventDefault();
                     handleNext();
                   }}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={currentPage === pagination.pages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
             </PaginationContent>

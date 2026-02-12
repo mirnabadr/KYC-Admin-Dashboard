@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, User, Settings } from 'lucide-react';
 import { Button } from './ui/button';

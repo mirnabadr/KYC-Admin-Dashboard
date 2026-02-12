@@ -1,0 +1,72 @@
+# Docker Compose - KYC Admin Dashboard
+# Run: docker compose up --build
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: kyc-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: kyc_admin
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - kyc-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Node.js/Express)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kyc-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/kyc_admin?authSource=admin
+      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-secure-random-string-in-production}
+      - CYBRID_API_URL=https://kyc-cybrid-mock.free.beeceptor.com
+      - CYBRID_CLIENT_ID=
+      - CYBRID_CLIENT_SECRET=
+      - CORS_ORIGIN=http://localhost
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - kyc-network
+
+  # Frontend (React/Vite served by Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:3001
+    container_name: kyc-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - kyc-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  kyc-network:
+    driver: bridge

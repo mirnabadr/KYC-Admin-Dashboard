@@ -32,7 +32,11 @@ export async function getBearerToken() {
 async function generateBearerToken() {
   const { cybrid } = config;
 
-  if (!cybrid.apiKey || !cybrid.apiSecret || cybrid.apiKey === 'your-api-key') {
+  if (!cybrid.apiKey || 
+      !cybrid.apiSecret || 
+      cybrid.apiKey === 'your-api-key' ||
+      cybrid.apiKey === 'your-client-id-here' ||
+      cybrid.apiSecret === 'your-client-secret-here') {
     throw new Error('Cybrid API credentials not configured');
   }
 

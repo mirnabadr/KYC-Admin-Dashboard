@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { mockAuditLogs, AuditAction, AuditStatus } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import { auditLogsApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -31,23 +32,47 @@ import { Search, Filter, Activity } from 'lucide-react';
 const ITEMS_PER_PAGE = 5;
 
 export function AuditLogs() {
+  const { user } = useAuth();
+  const isGlobalAdmin = user?.role === 'Global Admin';
   const [userFilter, setUserFilter] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [regionFilter, setRegionFilter] = useState<string>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, limit: ITEMS_PER_PAGE, total: 0, pages: 1 });
 
-  const filteredLogs = mockAuditLogs.filter((log) => {
-    if (userFilter && !log.user.toLowerCase().includes(userFilter.toLowerCase())) return false;
-    if (actionFilter !== 'all' && log.action !== actionFilter) return false;
-    if (statusFilter !== 'all' && log.status !== statusFilter) return false;
-    return true;
-  });
+  useEffect(() => {
+    fetchLogs();
+    if (autoRefresh) {
+      const interval = setInterval(fetchLogs, 30000); // Refresh every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [currentPage, actionFilter, statusFilter, regionFilter, userFilter, autoRefresh]);
 
-  const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      const filters: any = {
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      };
+      if (actionFilter !== 'all') filters.action = actionFilter;
+      if (statusFilter !== 'all') filters.status = statusFilter;
+      if (regionFilter !== 'all') filters.region = regionFilter;
+      if (userFilter) filters.userEmail = userFilter;
+
+      const response = await auditLogsApi.getAll(filters);
+      setLogs(response.data || []);
+      setPagination(response.pagination || { page: 1, limit: ITEMS_PER_PAGE, total: 0, pages: 1 });
+    } catch (error: any) {
+      console.error('Failed to fetch audit logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePrevious = () => {
     if (currentPage > 1) {
@@ -56,7 +81,7 @@ export function AuditLogs() {
   };
 
   const handleNext = () => {
-    if (currentPage < totalPages) {
+    if (currentPage < pagination.pages) {
       setCurrentPage(currentPage + 1);
     }
   };
@@ -64,7 +89,7 @@ export function AuditLogs() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [userFilter, actionFilter, statusFilter]);
+  }, [userFilter, actionFilter, statusFilter, regionFilter]);
 
   return (
     <div className="p-6 space-y-6">
@@ -98,7 +123,7 @@ export function AuditLogs() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">User</label>
               <div className="relative">
@@ -143,6 +168,26 @@ export function AuditLogs() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Region</label>
+              <Select 
+                value={regionFilter} 
+                onValueChange={setRegionFilter}
+                disabled={!isGlobalAdmin}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All regions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  <SelectItem value="US">US</SelectItem>
+                  <SelectItem value="EU">EU</SelectItem>
+                  <SelectItem value="APAC">APAC</SelectItem>
+                  <SelectItem value="LATAM">LATAM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -150,54 +195,66 @@ export function AuditLogs() {
       {/* Audit Logs Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedLogs.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              Loading audit logs...
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-slate-500 dark:text-slate-400">
-                      No audit logs found
-                    </TableCell>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Region</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Details</TableHead>
                   </TableRow>
-                ) : (
-                  paginatedLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="text-sm font-mono text-slate-900 dark:text-slate-100">{log.timestamp}</TableCell>
-                      <TableCell className="text-sm text-slate-900 dark:text-slate-100">{log.user}</TableCell>
-                      <TableCell className="text-sm font-medium text-slate-900 dark:text-slate-100">{log.action}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={log.status === 'Success' ? 'default' : 'destructive'}
-                          className="text-xs"
-                        >
-                          {log.status}
-                        </Badge>
+                </TableHeader>
+                <TableBody>
+                  {logs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        No audit logs found
                       </TableCell>
-                      <TableCell className="text-sm text-slate-600 dark:text-slate-400">{log.details}</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : (
+                    logs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-sm font-mono text-slate-900 dark:text-slate-100">{log.timestamp}</TableCell>
+                        <TableCell className="text-sm text-slate-900 dark:text-slate-100">{log.user}</TableCell>
+                        <TableCell className="text-sm font-medium text-slate-900 dark:text-slate-100">{log.action}</TableCell>
+                        <TableCell className="text-sm text-slate-600 dark:text-slate-400">
+                          {log.region ? (
+                            <Badge variant="outline" className="text-xs">{log.region}</Badge>
+                          ) : '—'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={log.status === 'Success' ? 'default' : 'destructive'}
+                            className="text-xs"
+                          >
+                            {log.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-600 dark:text-slate-400">{log.details}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Results info and Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-slate-600 dark:text-slate-400">
-          Showing {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} audit logs
+          Showing {logs.length > 0 ? ((currentPage - 1) * ITEMS_PER_PAGE + 1) : 0}-{Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} audit logs
         </div>
-        {totalPages > 1 && (
+        {pagination.pages > 1 && (
           <Pagination>
             <PaginationContent>
               <PaginationItem>
@@ -212,7 +269,7 @@ export function AuditLogs() {
               </PaginationItem>
               <PaginationItem>
                 <span className="text-sm text-slate-600 dark:text-slate-400 px-4">
-                  Page {currentPage} of {totalPages}
+                  Page {currentPage} of {pagination.pages}
                 </span>
               </PaginationItem>
               <PaginationItem>
@@ -222,7 +279,7 @@ export function AuditLogs() {
                     e.preventDefault();
                     handleNext();
                   }}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={currentPage === pagination.pages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
             </PaginationContent>

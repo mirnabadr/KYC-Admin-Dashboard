@@ -9,12 +9,10 @@ const auditLogSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    index: true,
   },
   userEmail: {
     type: String,
     required: true,
-    index: true,
   },
   action: {
     type: String,
@@ -35,13 +33,11 @@ const auditLogSchema = new mongoose.Schema({
       'View Transactions',
       'View Users',
     ],
-    index: true,
   },
   status: {
     type: String,
     required: true,
     enum: ['Success', 'Failure'],
-    index: true,
   },
   details: {
     type: String,
@@ -50,7 +46,6 @@ const auditLogSchema = new mongoose.Schema({
   // Resource information
   resourceId: {
     type: String,
-    index: true,
   },
   resourceType: {
     type: String,
@@ -59,7 +54,6 @@ const auditLogSchema = new mongoose.Schema({
   region: {
     type: String,
     enum: ['US', 'EU', 'APAC', 'LATAM', 'All Regions'],
-    index: true,
   },
   // IP address for security tracking
   ipAddress: {
@@ -74,7 +68,6 @@ const auditLogSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
     required: true,
-    index: true,
   },
   // Additional metadata
   metadata: {

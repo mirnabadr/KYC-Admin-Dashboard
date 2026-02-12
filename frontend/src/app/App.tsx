@@ -1,4 +1,3 @@
-import React from 'react';
 import { RouterProvider } from 'react-router';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';

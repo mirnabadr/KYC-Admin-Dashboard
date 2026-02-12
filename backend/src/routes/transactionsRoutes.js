@@ -5,6 +5,7 @@ import express from 'express';
 import {
   getTransactions,
   getTransaction,
+  getTransactionStatus,
   createTransaction,
   updateTransactionStatus,
 } from '../controllers/transactionsController.js';
@@ -19,6 +20,9 @@ router.use(authenticateToken);
 
 // Get all transactions
 router.get('/', asyncHandler(getTransactions));
+
+// Get transaction status (must be before /:id to avoid route collision)
+router.get('/:id/status', asyncHandler(getTransactionStatus));
 
 // Get single transaction
 router.get('/:id', asyncHandler(getTransaction));

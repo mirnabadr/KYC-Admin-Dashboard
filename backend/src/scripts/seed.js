@@ -4,6 +4,7 @@
  */
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import { connectDatabase, closeDatabase } from '../config/database.js';
 import { User } from '../models/User.js';
 import { Transaction } from '../models/Transaction.js';
@@ -28,7 +29,7 @@ async function seed() {
 
     // Create users
     console.log('👥 Creating users...');
-    const users = [
+    const usersData = [
       {
         email: 'admin@kyc.com',
         password: 'admin123',
@@ -65,6 +66,18 @@ async function seed() {
         region: 'LATAM',
       },
     ];
+
+    // Hash passwords before inserting (insertMany doesn't trigger pre-save hooks)
+    const users = await Promise.all(
+      usersData.map(async (userData) => {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(userData.password, salt);
+        return {
+          ...userData,
+          password: hashedPassword,
+        };
+      })
+    );
 
     const createdUsers = await User.insertMany(users);
     console.log(`✅ Created ${createdUsers.length} users\n`);

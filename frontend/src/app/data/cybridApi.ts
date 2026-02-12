@@ -45,10 +45,17 @@ function getMockRate(): CybridRate {
   };
 }
 
+/** Poll interval in ms for real-time rate updates (15 seconds) */
+const RATE_POLL_INTERVAL_MS = 10 * 1000;
+
+/**
+ * Subscribe to live rate updates from the API (Beeceptor/backend).
+ * Call the returned function to stop polling.
+ */
 export function subscribeToRateUpdates(callback: (rate: CybridRate) => void) {
   const interval = setInterval(async () => {
     const rate = await fetchUSDtoUSDCRate();
     callback(rate);
-  }, 30000);
+  }, RATE_POLL_INTERVAL_MS);
   return () => clearInterval(interval);
 }

@@ -131,6 +131,35 @@ export const getTransaction = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get transaction status by ID
+ * GET /api/transactions/:id/status
+ */
+export const getTransactionStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const transaction = await Transaction.findOne({ transactionId: id }).lean();
+
+  if (!transaction) {
+    throw new AppError('Transaction not found', 404, 'NOT_FOUND');
+  }
+
+  // Check region access
+  if (!canAccessResource(req.user, transaction.region)) {
+    throw new AppError('Access denied for this transaction', 403, 'ACCESS_DENIED');
+  }
+
+  res.json({
+    success: true,
+    data: {
+      id: transaction.transactionId,
+      status: transaction.status,
+      kycStatus: transaction.kycStatus,
+      updatedAt: transaction.updatedAt,
+    },
+  });
+});
+
+/**
  * Create new transaction
  * POST /api/transactions
  */
