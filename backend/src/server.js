@@ -21,9 +21,30 @@ import usersRoutes from './routes/usersRoutes.js';
 // Initialize Express app
 const app = express();
 
-// CORS configuration
+// CORS configuration — supports comma-separated origins and Vercel preview URLs
+const allowedOrigins = config.cors.origin
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: config.cors.origin,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (server-to-server, curl, health checks)
+    if (!origin) return callback(null, true);
+    // Allow if origin matches any allowed origin
+    if (allowedOrigins.some(allowed => origin === allowed)) {
+      return callback(null, true);
+    }
+    // Allow any *.vercel.app origin (preview deployments)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    // Allow localhost for development
+    if (origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: config.cors.credentials,
 }));
 
