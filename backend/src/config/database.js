@@ -12,8 +12,14 @@ if (!MONGODB_URI) {
 
 /**
  * Connect to MongoDB with error handling and reconnection logic
+ * Reuses existing connection if already connected (important for serverless)
  */
 export async function connectDatabase() {
+  // Skip if already connected (reuse connection in serverless environments)
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
   try {
     await mongoose.connect(MONGODB_URI, {
       // Use modern connection options
